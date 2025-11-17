@@ -172,7 +172,7 @@
     <div class="welcome">
       <h2>Debug Console Initialized</h2>
       <p>Waiting for WebSocket connection to backend server...</p>
-      <p>Server: ws://localhost:3000</p>
+      <p id="serverUrl">Server: Connecting...</p>
       <p>All AI processing events and system logs will appear here in real-time.</p>
     </div>
   </div>
@@ -209,7 +209,17 @@
 
     function connectWebSocket() {
       try {
-        ws = new WebSocket('ws://localhost:3000');
+        // Auto-detect WebSocket URL based on environment
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+          ? 'localhost:3000'
+          : window.location.host;
+        const wsUrl = `${protocol}//${host}`;
+
+        // Update server URL in UI
+        document.getElementById('serverUrl').textContent = `Server: ${wsUrl}`;
+
+        ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
           statusDot.classList.add('connected');
