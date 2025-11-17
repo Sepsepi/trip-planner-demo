@@ -1312,16 +1312,25 @@
       const TripFinalizer = ({ itinerary, hotel, onClose }) => {
         if (!itinerary || itinerary.length === 0) return null;
 
+        const [showNotifyModal, setShowNotifyModal] = useState(false);
+        const [notifyEmail, setNotifyEmail] = useState('');
+        const [notifyTiming, setNotifyTiming] = useState('1-day-before');
+        const [notifySuccess, setNotifySuccess] = useState(false);
+
         // ESC key handler
         React.useEffect(() => {
           const handleEsc = (e) => {
             if (e.key === 'Escape') {
-              onClose();
+              if (showNotifyModal) {
+                setShowNotifyModal(false);
+              } else {
+                onClose();
+              }
             }
           };
           window.addEventListener('keydown', handleEsc);
           return () => window.removeEventListener('keydown', handleEsc);
-        }, [onClose]);
+        }, [onClose, showNotifyModal]);
 
         // Get full activity data from database
         const getFullActivityData = (itineraryItem) => {
@@ -1564,15 +1573,144 @@
 
               {/* Footer */}
               <div className="bg-gray-50 p-6 flex-shrink-0 border-t">
-                <button
-                  onClick={onClose}
-                  className="w-full bg-gradient-to-r from-black to-gray-800 text-white py-4 px-6 rounded-xl font-bold text-lg hover:from-gray-800 hover:to-gray-700 transition-all shadow-lg"
-                >
-                  Got It! Back to Map
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowNotifyModal(true)}
+                    className="flex-1 bg-white border-2 border-black text-black py-4 px-6 rounded-xl font-bold text-lg hover:bg-gray-100 transition-all shadow-lg flex items-center justify-center gap-2"
+                  >
+                    <div
+                      className="w-6 h-6"
+                      dangerouslySetInnerHTML={{ __html: ACTIVITY_ICONS.notification('#000').replace('width="20" height="20"', 'width="24" height="24"') }}
+                    />
+                    Notify Me
+                  </button>
+                  <button
+                    onClick={onClose}
+                    className="flex-1 bg-gradient-to-r from-black to-gray-800 text-white py-4 px-6 rounded-xl font-bold text-lg hover:from-gray-800 hover:to-gray-700 transition-all shadow-lg"
+                  >
+                    Back to Map
+                  </button>
+                </div>
               </div>
 
             </div>
+
+            {/* Notification Setup Modal */}
+            {showNotifyModal && (
+              <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4" onClick={() => setShowNotifyModal(false)}>
+                <div className="bg-white rounded-2xl max-w-md w-full p-8 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+
+                  {notifySuccess ? (
+                    // Success State
+                    <div className="text-center">
+                      <div className="mb-6">
+                        <div
+                          className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4"
+                          dangerouslySetInnerHTML={{ __html: ACTIVITY_ICONS.checkmark('#059669').replace('width="20" height="20"', 'width="32" height="32"') }}
+                        />
+                        <h3 className="text-2xl font-bold text-gray-900 mb-2">You're All Set!</h3>
+                        <p className="text-gray-600">We'll send you a reminder at the perfect time.</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setShowNotifyModal(false);
+                          setNotifySuccess(false);
+                        }}
+                        className="w-full bg-black text-white py-3 px-6 rounded-xl font-semibold hover:bg-gray-800 transition-colors"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  ) : (
+                    // Setup Form
+                    <>
+                      <div className="flex items-start justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-12 h-12 bg-black rounded-full flex items-center justify-center"
+                            dangerouslySetInnerHTML={{ __html: ACTIVITY_ICONS.notification('#FFF').replace('width="20" height="20"', 'width="24" height="24"') }}
+                          />
+                          <div>
+                            <h3 className="text-2xl font-bold text-gray-900">Trip Reminders</h3>
+                            <p className="text-sm text-gray-600">Never miss your adventure</p>
+                          </div>
+                        </div>
+                        <button onClick={() => setShowNotifyModal(false)} className="text-gray-600 hover:text-black">
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+
+                      <div className="space-y-5">
+                        {/* Email Input */}
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-900 mb-2">Your Email</label>
+                          <input
+                            type="email"
+                            value={notifyEmail}
+                            onChange={(e) => setNotifyEmail(e.target.value)}
+                            placeholder="you@example.com"
+                            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-black focus:outline-none text-gray-900"
+                          />
+                        </div>
+
+                        {/* Timing Selection */}
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-900 mb-3">When to Notify</label>
+                          <div className="space-y-2">
+                            {[
+                              { value: '1-day-before', label: '1 day before trip', desc: 'Get ready the day before' },
+                              { value: 'morning-of', label: 'Morning of trip', desc: 'Start your day prepared' },
+                              { value: '1-hour-before', label: '1 hour before first activity', desc: 'Last minute reminder' },
+                              { value: 'all', label: 'All reminders', desc: 'Stay on top of everything' }
+                            ].map((option) => (
+                              <label
+                                key={option.value}
+                                className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                                  notifyTiming === option.value
+                                    ? 'border-black bg-gray-50'
+                                    : 'border-gray-200 hover:border-gray-300'
+                                }`}
+                              >
+                                <input
+                                  type="radio"
+                                  name="timing"
+                                  value={option.value}
+                                  checked={notifyTiming === option.value}
+                                  onChange={(e) => setNotifyTiming(e.target.value)}
+                                  className="mt-1"
+                                />
+                                <div className="flex-1">
+                                  <div className="font-semibold text-gray-900 text-sm">{option.label}</div>
+                                  <div className="text-xs text-gray-600">{option.desc}</div>
+                                </div>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Submit Button */}
+                        <button
+                          onClick={() => {
+                            if (notifyEmail) {
+                              // TODO: Send to backend
+                              setNotifySuccess(true);
+                            } else {
+                              alert('Please enter your email');
+                            }
+                          }}
+                          className="w-full bg-black text-white py-4 px-6 rounded-xl font-bold text-lg hover:bg-gray-800 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={!notifyEmail}
+                        >
+                          Set Reminders
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         );
       };
