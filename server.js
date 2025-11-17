@@ -14,9 +14,6 @@ const wss = new WebSocket.Server({ server });
 app.use(cors());
 app.use(express.json());
 
-// Serve static files
-app.use(express.static(__dirname));
-
 // OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -52,16 +49,6 @@ wss.on('connection', (ws) => {
     debugClients.delete(ws);
     logToDebug('Debug console disconnected', 'info');
   });
-});
-
-// Serve main app at root
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'airbnb-map-demo.html'));
-});
-
-// Serve debug console
-app.get('/debug', (req, res) => {
-  res.sendFile(path.join(__dirname, 'debug-console.html'));
 });
 
 // Health check endpoint
@@ -252,6 +239,19 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 function toRad(degrees) {
   return degrees * (Math.PI / 180);
 }
+
+// Serve main app at root
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'airbnb-map-demo.html'));
+});
+
+// Serve debug console
+app.get('/debug', (req, res) => {
+  res.sendFile(path.join(__dirname, 'debug-console.html'));
+});
+
+// Serve static files (data.js, etc.)
+app.use(express.static(__dirname));
 
 // Start server
 const PORT = process.env.PORT || 3000;
