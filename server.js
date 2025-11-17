@@ -4,6 +4,7 @@ const cors = require('cors');
 const WebSocket = require('ws');
 const OpenAI = require('openai');
 const http = require('http');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
@@ -12,6 +13,9 @@ const wss = new WebSocket.Server({ server });
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Serve static files
+app.use(express.static(__dirname));
 
 // OpenAI client
 const openai = new OpenAI({
@@ -48,6 +52,16 @@ wss.on('connection', (ws) => {
     debugClients.delete(ws);
     logToDebug('Debug console disconnected', 'info');
   });
+});
+
+// Serve main app at root
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'airbnb-map-demo.html'));
+});
+
+// Serve debug console
+app.get('/debug', (req, res) => {
+  res.sendFile(path.join(__dirname, 'debug-console.html'));
 });
 
 // Health check endpoint
