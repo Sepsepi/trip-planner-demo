@@ -61,6 +61,7 @@ app.post('/api/generate-itinerary', async (req, res) => {
   const { mode, hotel, activities, preferences } = req.body;
 
   logToDebug(`Received ${mode} itinerary request for ${hotel.name}`, 'info');
+  logToDebug(`Hotel Location: ${hotel.lat}, ${hotel.lng} (${hotel.city})`, 'info');
   logToDebug(`Preferences: Budget=$${preferences.budget}, Distance=${preferences.maxDistance}mi, Duration=${preferences.duration}`, 'info');
 
   try {
@@ -78,9 +79,13 @@ app.post('/api/generate-itinerary', async (req, res) => {
 
     logToDebug(`Found ${filtered.length} activities within criteria`, 'success');
 
+    // Log sample of activities being analyzed
+    const sampleActivities = filtered.slice(0, 3).map(a => `${a.name} (${a.type}, $${a.price})`).join(', ');
+    logToDebug(`Sample activities: ${sampleActivities}${filtered.length > 3 ? ', ...' : ''}`, 'info');
+
     // Build prompt based on mode
     const prompt = buildPrompt(mode, hotel, filtered, preferences);
-    logToDebug(`Calling OpenAI GPT-4 Turbo...`, 'info');
+    logToDebug(`Calling OpenAI GPT-4 Turbo with ${filtered.length} activities and hotel coordinates...`, 'info');
 
     // Set headers for streaming
     res.setHeader('Content-Type', 'text/event-stream');
@@ -182,22 +187,31 @@ app.post('/api/generate-itinerary', async (req, res) => {
 
 // Build prompt based on mode
 function buildPrompt(mode, hotel, activities, preferences) {
-  // Optimize: Only send essential fields to reduce token usage
-  // Remove: reviews count, price_range (redundant with price), long descriptions
-  const activityList = activities.map(a =>
-    `${a.name} | ${a.type} | $${a.price || 0} | ${a.rating}★`
+  // Include location data for geographic routing
+  const activityList = activities.map((a, idx) =>
+    `${idx + 1}. ${a.name} | ${a.type} | $${a.price || 0} | ${a.rating}★ | Location: (${a.lat}, ${a.lng})`
   ).join('\n');
 
+  const hotelLocation = `Hotel: ${hotel.name} at (${hotel.lat}, ${hotel.lng})`;
+
   if (mode === 'quick') {
-    return `Activities near ${hotel.name}:
+    return `${hotelLocation}
+
+Nearby Activities:
 ${activityList}
 
-Budget: $${preferences.budget} | Max distance: ${preferences.maxDistance}mi | Time: ${preferences.duration}
+Constraints: Budget=$${preferences.budget} | Max distance=${preferences.maxDistance}mi | Time=${preferences.duration}
 
-Think step-by-step, then recommend 5 best activities.
+TASK: Analyze the geographic locations and recommend 5 best activities.
+
+Think through:
+1. Which activities are geographically close to the hotel?
+2. Which offer best value (rating vs price)?
+3. How to ensure variety (different types)?
+4. Any notable options or must-sees?
 
 Format:
-REASONING: [brief thoughts on selection criteria, variety, and budget fit]
+REASONING: [Your step-by-step thinking about locations, distances, value, and variety. Be explicit about your geographic analysis.]
 RESULT: [{"name":"...","type":"...","time_needed_minutes":90,"why_chosen":"..."}]
 
 Output ONLY JSON after RESULT: - no extra text.`;
@@ -206,17 +220,31 @@ Output ONLY JSON after RESULT: - no extra text.`;
     const durationMinutes = preferences.duration === 'Full Day' ? 480 :
                            preferences.duration === 'Half Day' ? 240 : 180;
 
-    return `Itinerary from ${hotel.name}:
+    return `${hotelLocation}
 
-Activities:
+Available Activities (with coordinates):
 ${activityList}
 
-Budget: $${preferences.budget} | Distance: ${preferences.maxDistance}mi | Duration: ${durationMinutes}min | Start: 9AM
+Constraints: Budget=$${preferences.budget} | Max Distance=${preferences.maxDistance}mi | Duration=${durationMinutes}min | Start Time=9:00 AM
 
-Plan an efficient route with no backtracking. Consider grouping, timing, budget, and travel.
+TASK: Create an optimized route starting from the hotel.
+
+Think through:
+1. Calculate approximate distances between locations using coordinates
+2. Group nearby activities to minimize backtracking
+3. Plan logical geographic flow (north to south, or circular route)
+4. Allocate realistic time for each activity + travel time
+5. Stay within budget and time constraints
+6. Consider activity types and timing (lunch, breaks, etc.)
 
 Format:
-REASONING: [routing logic, time allocation, budget strategy, trade-offs]
+REASONING: [Explicit step-by-step analysis:
+- Geographic clustering of activities
+- Distance calculations between stops
+- Route optimization logic (why this order?)
+- Time allocation reasoning
+- Budget breakdown
+- Any trade-offs made]
 RESULT: [{"time":"9:00 AM","activity":"...","type":"...","duration_minutes":90,"travel_time_minutes":10,"cost":25,"notes":"..."}]
 
 Output ONLY JSON after RESULT: - no extra text or markdown.`;
