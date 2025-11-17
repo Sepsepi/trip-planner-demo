@@ -108,43 +108,24 @@ app.post('/api/generate-itinerary', async (req, res) => {
     });
 
     let fullResponse = '';
-    let currentSection = '';
-    let reasoningBuffer = '';
-    let inReasoning = false;
+    let buffer = '';
 
     for await (const chunk of stream) {
       const content = chunk.choices[0]?.delta?.content || '';
       if (content) {
         fullResponse += content;
-        reasoningBuffer += content;
+        buffer += content;
 
-        // Detect REASONING section
-        if (reasoningBuffer.includes('REASONING:') && !inReasoning) {
-          inReasoning = true;
-          logToDebug('AI started reasoning process...', 'info');
-          reasoningBuffer = '';
-        }
-
-        // Detect RESULT section (reasoning done)
-        if (reasoningBuffer.includes('RESULT:') && inReasoning) {
-          inReasoning = false;
-          logToDebug('AI completed reasoning, generating itinerary...', 'success');
-          reasoningBuffer = '';
-        }
-
-        // Log reasoning content in real-time
-        if (inReasoning && content.trim()) {
-          // Check if we have a complete sentence or thought
-          if (content.includes('.') || content.includes('\n')) {
-            const sentences = reasoningBuffer.split(/(?<=[.!?])\s+/);
-            for (let i = 0; i < sentences.length - 1; i++) {
-              const sentence = sentences[i].trim();
-              if (sentence && sentence.length > 10) {
-                logToDebug(`AI: ${sentence}`, 'info');
-              }
+        // Log AI output in real-time (complete sentences)
+        if (content.includes('.') || content.includes('\n') || content.includes('!') || content.includes('?')) {
+          const sentences = buffer.split(/(?<=[.!?\n])\s*/);
+          for (let i = 0; i < sentences.length - 1; i++) {
+            const sentence = sentences[i].trim();
+            if (sentence && sentence.length > 5) {
+              logToDebug(`AI: ${sentence}`, 'info');
             }
-            reasoningBuffer = sentences[sentences.length - 1];
           }
+          buffer = sentences[sentences.length - 1];
         }
 
         // Send chunk to frontend
